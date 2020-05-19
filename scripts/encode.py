@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 def encode_dayhoff(letter, dayhoff):
     k_ = [k for k in dayhoff if letter in k][0]
-    return dayhoff[k_] 
+    return dayhoff[k_]
 
 
 '''
@@ -71,6 +71,7 @@ parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('-i', help='Protein fasta')
 parser.add_argument('-o', help='Dayhoff fasta')
 parser.add_argument('--length', help='Truncate to this', default=None, type=int)
+parser.add_argument('--skip-header', help='Skip fasta header', action='store_true')
 args = parser.parse_args()
 
 
@@ -80,8 +81,10 @@ with screed.open(args.i) as seqfile, open(args.o, 'w+') as out:
             seq = ''.join([encode_dayhoff(i, dayhoff) for i in read.sequence])
             if args.length:
                 seq = seq[:args.length]
-
-            out.write(f'>{read.name}\n{seq}\n')
+            if args.skip_header:
+                out.write(f'{seq}\n')
+            else:
+                out.write(f'>{read.name}\n{seq}\n')
         except IndexError:
             continue
 
