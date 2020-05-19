@@ -36,7 +36,7 @@ def load_pretrained_tokenizer(tokenizer_type, path_prefix):
     return tokenizer_type(vocab, merges)
 
 
-def load_db(self, path):
+def load_sequences(path):
     '''
     Load the sequences and index them if no index has been computed before.
     '''
