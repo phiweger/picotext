@@ -12,7 +12,7 @@ cfg
 wip/
 nextflow-autodownload-databases/
 work/
-data/
+# data/
 .nextflow/
 results/
 
