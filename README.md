@@ -8,6 +8,18 @@ then predict small molecules
 
 skin microbiome interesting, in general outer/ inner surfaces
 
+
+### Installation
+
+```bash
+# install dependencies
+sh install.sh
+# get data
+osf -p pefs7 clone
+```
+
+
+
 ### TODO
 
 API:

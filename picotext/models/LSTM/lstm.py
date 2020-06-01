@@ -4,6 +4,8 @@ https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/2%20-%20Upg
 test_loss, test_acc = evaluate(model, test_iter, loss_fn)
 print(round(test_loss, 4), round(test_acc, 4))
 0.0805 0.9684
+
+tensorboard --logdir .
 '''
 
 
