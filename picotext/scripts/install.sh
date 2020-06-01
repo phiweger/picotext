@@ -3,4 +3,4 @@ conda activate picotext
 conda install -y -c conda-forge osfclient
 conda install -y -c bioconda screed
 conda install -y -c pytorch pytorch torchvision torchtext 
-pip install -y tokenizers==0.7.0
+pip install tokenizers==0.7.0
