@@ -1,3 +1,7 @@
+from pathlib import Path
+
+import screed
+from screed import ScreedDB
 from tokenizers import CharBPETokenizer
 
 
@@ -8,6 +12,7 @@ def train_tokenizer(tokenizer, files: list, **kwargs):
     Usage:
 
     # Encode proteins in Dayhoff encoding, one sequence per line
+    # !pip install screed tqdm tokenizers==0.7.0
     files = ['./uniprot_sprot.dayhoff.txt']
     tokenizer = train_tokenizer(
         CharBPETokenizer(bert_normalizer=False),
