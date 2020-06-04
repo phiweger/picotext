@@ -12,15 +12,21 @@ skin microbiome interesting, in general outer/ inner surfaces
 ### Installation
 
 ```bash
-# install dependencies
+# Install dependencies
 sh install.sh
-# get data
+# Get data
 osf -p pefs7 clone
 ```
 
 
 
 ### TODO
+
+load data:
+
+- json
+- script: fasta > json
+
 
 API:
 

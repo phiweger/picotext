@@ -59,6 +59,13 @@ def encode_dayhoff(seq):
 
     https://en.wikipedia.org/wiki/Margaret_Oakley_Dayhoff
 
+    a: sulfur polymerization
+    b: small
+    c: acid and amide
+    d: acid and amide
+    e: hydrophobic
+    f: aromatic
+
     Usage:
 
     seq = 'MAFSAEDVLKEYDRRRRMEALLLSLYYPNDRKLLDYKEWSPPRVQVEC'

@@ -1,6 +1,4 @@
-'''
-https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/1%20-%20Simple%20Sentiment%20Analysis.ipynb
-'''
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -11,10 +9,11 @@ from torchtext import data
 # https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/5%20-%20Multi-class%20Sentiment%20Analysis.ipynb
 # Two classes: dtype=torch.float
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-TEXT = data.Field(sequential=True, include_lengths=False, batch_first=False)
-LABELS = data.LabelField()
+TEXT = data.Field(sequential=True)
+LABELS = data.LabelField(dtype=torch.float)
 NAMES = data.RawField(is_target=False)
 
 # Fields are added by column left to write in the underlying table
@@ -24,6 +23,13 @@ train, dev, test = data.TabularDataset.splits(
     path='tmp/processed', format='CSV', fields=fields,
     train='train.csv', validation='dev.csv', test='test.csv')
 
+TEXT.build_vocab(train)
+# TEXT.vocab.itos[1] ... '<pad>'
+# TEXT.vocab.itos[0] ... '<unk>'
+LABELS.build_vocab(train)
+# LABELS.vocab.freqs
+# Counter({'toxin': 6271, 'negative': 37514})
+
 # https://github.com/pytorch/text/issues/641
 train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     (train, dev, test),
@@ -31,18 +37,53 @@ train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     sort_key=lambda x: len(x.text),
     device='cpu')
 
-TEXT.build_vocab(train)
-# TEXT.vocab.itos[1] ... '<pad>'
-# TEXT.vocab.itos[0] ... '<unk>'
-LABELS.build_vocab(train)
-# LABELS.vocab.freqs
-# Counter({'toxin': 6271, 'negative': 37514})
+
 '''
 a = train.examples[0]
 a.name ... 'sp_tox|F8QN53|PA2A2_VIPRE'
 a.label ... 'toxin'
 a.text[:4] ... ['edee', 'feebe', 'aeebe', 'cbcef']
 '''
+
+
+
+
+
+
+
+
+
+
+
+TEXT = data.Field(sequential=True)
+
+# Fields are added by column left to write in the underlying table
+fields=[('text', TEXT)]
+
+
+
+
+
+
+train, dev, test = data.TabularDataset.splits(
+    path='tmp/processed', format='CSV', fields=fields,
+    train='train.lm.csv', validation='dev.lm.csv', test='test.lm.csv')
+
+TEXT.build_vocab(train)
+
+a, b, c = train_iter, dev_iter, test_iter = data.BPTTIterator.splits(
+    (train, dev, test),
+    batch_size=7,
+    bptt_len=35,
+    device=device,
+    repeat=False)
+
+batch = next(iter(a))
+print(batch.text)
+print(batch.target)
+
+
+
 
 
 cnt = dict(LABELS.vocab.freqs)
@@ -195,7 +236,7 @@ loss_fn = nn.BCEWithLogitsLoss()
 
 for epoch in range(50):
     for batch in train_iter:
-        y = batch.label.float()  # the BPE loss needs float
+        y = batch.label  # the BPE loss needs float
         '''
         Many sequences are 100 tokens long and longer. These long-range
         interactions are hard for RNN to keep pass down the chain. For now,
