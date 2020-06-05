@@ -5,6 +5,13 @@ load pretrained
 
 https://stackoverflow.com/questions/49710537/pytorch-gensim-how-to-load-pre-trained-word-embeddings
 
+
+TODO:
+
+- port weights
+- port vocabulary to transfer task
+- compute number of correctly predicted words
+
 '''
 import time
 
@@ -49,7 +56,7 @@ def get_batch(source, i):
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
+    def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers=2, dropout=0.5, tie_weights=False):
         super(RNNModel, self).__init__()
         self.ntoken = ntoken
         self.drop = nn.Dropout(dropout)
@@ -73,6 +80,7 @@ class RNNModel(nn.Module):
         # and
         # "Tying Word Vectors and Word Classifiers: A Loss Framework for Language Modeling" (Inan et al. 2016)
         # https://arxiv.org/abs/1611.01462
+
         if tie_weights:
             if nhid != ninp:
                 raise ValueError('When using the tied flag, nhid must be equal to emsize')
@@ -121,6 +129,8 @@ def train():
     for batch, i in enumerate(range(0, train_data.size(0) - 1, bptt)):
         # To overfit one batch do
         # ... in [next(enumerate(range(0, train_data.size(0) - 1, bptt)))]
+        # Then revert
+        # ... in enumerate(range(0, train_data.size(0) - 1, bptt))
         data, targets = get_batch(train_data, i)
         
         optimizer.zero_grad()
@@ -131,13 +141,13 @@ def train():
         hidden = repackage_hidden(hidden)
         
         output, hidden = model(data, hidden)
-        # TODO: Why is this the other way around than in the eval fn and does
-        # it matter?
-        
+        '''
+        model(batch, hidden)[0].shape
+        torch.Size([3000, 9978])
+        len(targets)
+        3000
+        '''
         loss = criterion(output, targets)
-
-
-
         loss.backward()
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
@@ -197,6 +207,22 @@ def evaluate(data_source):
 
     # print(Counter(bar))
     loss_avg = total_loss / (len(data_source) - 1)
+
+    sm = nn.Softmax(dim=1)
+    p_max = torch.argsort(sm(output), dim=1)[:, -10:]
+
+    # print(targets)
+    # print(output.shape)
+
+    nextword = []
+    for ix, i in enumerate(p_max):
+        if ix < 5:
+            print(ix, i, targets[ix])
+        nextword.append(any([x == targets[ix] for x in i]))
+
+    print('Top-k correct words:')
+    print(round(sum(nextword)/len(nextword), 4))
+
     # return output and loss of the last batch
     return loss_avg
 
@@ -235,7 +261,7 @@ tensor([126, 131, 245,  53,  87])
 cd .../picotext/journal/2020-05-23T1315/tmp/processed
 for i in train dev test
 do
-    cut -d, -f3 ${i}.csv | head -n 1000 > ${i}.lm.txt
+    cut -d, -f3 ${i}.csv | head -n 10000 > ${i}.lm.txt
 done
 # | head -n 10000
 '''
@@ -257,7 +283,7 @@ https://discuss.pytorch.org/t/aligning-torchtext-vocab-index-to-loaded-embedding
 '''
 
 
-batch_size = 50
+batch_size = 100
 eval_batch_size = 10
 train_data = batchify(corpus.train, batch_size)
 dev_data = batchify(corpus.dev, eval_batch_size)
@@ -267,20 +293,21 @@ ntokens = len(corpus.dictionary)
 
 bptt = 30
 clip = 0.5
-log_interval = 10
-lr = 3e-4  #20
+log_interval = 100
+lr = 0.001# 3e-4  #20
 best_val_loss = None
 epochs = 20
 save = 'foo'
 
 emsize = 100
-nhid = 1024
+nhid = 100#1024
 nlayers = 2
 dropout = 0.5
 tied = False
 
 model = RNNModel('GRU', ntokens, emsize, nhid, nlayers, dropout, tied).to(device)
-criterion = nn.CrossEntropyLoss() #nn.NLLLoss()
+criterion = nn.NLLLoss() #nn.NLLLoss() CrossEntropyLoss()
+# TODO: I already return logsoftmax during forward pass so I need NLLLoss!
 '''
 nn.NLLLoss?
 
@@ -314,8 +341,10 @@ try:
                 'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
                                            val_loss, math.exp(val_loss)))
         print('-' * 89)
+        
         writer.add_scalar('Loss/ train', round(train_loss, 4), epoch)
         writer.add_scalar('Loss/ dev', round(val_loss, 4), epoch)
+        
         # Save the model if the validation loss is the best we've seen so far.
         # if not best_val_loss or val_loss < best_val_loss:
         #     with open(save, 'wb') as f:
@@ -349,3 +378,272 @@ print('=' * 89)
 
 # tensorboard --logdir .
 # in floydhub https://docs.floydhub.com/guides/jobs/tensorboard/
+
+
+
+# Now transfer these weights and train classifier
+
+# https://discuss.pytorch.org/t/does-deepcopying-optimizer-of-one-model-works-across-the-model-or-should-i-create-new-optimizer-every-time/14359
+# https://discuss.pytorch.org/t/transfer-learning-of-weights-to-one-model-to-another/23962
+# https://discuss.pytorch.org/t/copy-weights-only-from-a-networks-parameters/5841/2?u=ptrblck
+
+'''
+so really we just copy weights, freeze stuff, get a new optimizer and go
+
+http://seba1511.net/tutorials/beginner/transfer_learning_tutorial.html#finetuning-the-convnet
+'''
+
+
+'''
+# Load pretrained weights
+model2 = RNNModel('GRU', ntokens, emsize, nhid, nlayers, dropout, tied).to(device)
+model2.load_state_dict(model.state_dict())  # <All keys matched successfully>
+
+# Change output layer
+insize = model.decoder.in_features
+model2.decoder = nn.Linear(insize, 1)
+model2.forward = lambda x: print(x)
+
+def foo(x):
+    return x
+
+model2.forward = foo
+
+
+# https://discuss.pytorch.org/t/are-there-any-recommended-methods-to-clone-a-model/483/11
+import copy
+m2 = copy.deepcopy(model)
+n_classes = 2
+m2.decoder = nn.Linear(model.decoder.in_features, n_classes)
+
+
+
+
+def forward(self, input, hidden):
+    emb = self.drop(self.encoder(input))
+    output, hidden = self.rnn(emb, hidden)
+    output = self.drop(output)
+    decoded = self.decoder(output)
+    return 'whoop'
+    # decoded = decoded.view(-1, self.ntoken)
+    # return F.log_softmax(decoded, dim=1), hidden
+
+
+m2.forward = forward
+m2(m2, batch, hidden)
+'''
+
+
+class MoreRNN(RNNModel):
+    '''
+    # Pretrain some model
+    init_args =['GRU', ntokens, emsize, nhid, nlayers, dropout, tied]
+    nclass = 2
+
+    m2 = MoreRNN(model, nclass, init_args)
+    output, hidden = m2(batch, hidden)
+
+    # Weights sould be the same
+    model.state_dict()['encoder.weight']
+    m2.state_dict()['encoder.weight']
+
+    # The new decoder is initialized randomly
+    m2.state_dict()['decoder.weight']
+    '''
+    def __init__(self, pretrained_model, nclass, init_args):
+        super(MoreRNN, self).__init__(*init_args)
+        # We now predict one out of n classes, not one out of n tokens
+        self.load_state_dict(pretrained_model.state_dict())
+        self.ntoken = nclass
+        # Override decoder to reduce number of classes
+        self.decoder = nn.Linear(self.decoder.in_features, nclass)
+
+    def forward(self, input, hidden):
+        emb = self.drop(self.encoder(input))
+        output, hidden = self.rnn(emb, hidden)
+        # nn.GRU?
+        # seq_len, batch, num_directions * hidden_size
+        # E.g. torch.Size([30, 100, 100])
+
+        # Make prediction based on last hidden state
+        output = self.drop(output[-1, :, :])
+        decoded = self.decoder(output)
+        decoded = decoded.view(-1, self.ntoken)
+        # return torch.log_softmax(decoded, dim=1), hidden
+        return torch.sigmoid(decoded), hidden
+
+
+init_args =['GRU', ntokens, emsize, nhid, nlayers, dropout, tied]
+nclass = 2
+model_ft = MoreRNN(model, nclass, init_args)  # ft .. finetune
+
+# Freeze all layers
+# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+for name, param in model_ft.named_parameters():
+    if not name in ['decoder.weight', 'decoder.bias']:
+        param.requires_grad = False
+    print(f'{param.requires_grad}\t{name}')
+# TODO: thaw layers iteratively
+# optimizer_ft.add_param_group?
+
+
+criterion_ft = nn.BCELoss()  # WithLogits
+optimizer_ft = torch.optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+
+'''
+# Observe that all parameters are being optimized
+optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+# Decay LR by a factor of 0.1 every 7 epochs
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+'''
+
+# batch, targets = get_batch(train_data, 0)
+# emb = model2.encoder(batch)
+# hidden = model.init_hidden(batch_size)
+# output, hidden = model2.rnn(emb, hidden)
+
+# model2.decoder(output)[-1].shape
+
+# https://discuss.pytorch.org/t/how-to-modify-a-pretrained-model/60509
+# https://discuss.pytorch.org/t/modify-forward-of-pretrained-model/52530
+# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
+# https://heartbeat.fritz.ai/transfer-learning-with-pytorch-cfcb69016c72
+# https://brsoff.github.io/tutorials/beginner/transfer_learning_tutorial.html
+# https://github.com/pytorch/tutorials/blob/master/beginner_source/transfer_learning_tutorial.py
+
+# https://github.com/pytorch/tutorials/blob/master/beginner_source/transfer_learning_tutorial.py
+# https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
+
+# https://www.youtube.com/watch?v=K0j9AqcFsiw
+# Python Pytorch Tutorials # 1 Transfer Learning : DataLoaders Pytorch
+
+'''
+See "Freezing the convolutional layers & replacing the fully connected layers with a custom classifier" -- https://heartbeat.fritz.ai/transfer-learning-with-pytorch-cfcb69016c72
+
+They call it "Reshaping" the model:
+
+> Now to the most interesting part. Here is where we handle the reshaping of each network. Note, this is not an automatic procedure and is unique to each model. -- https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+
+Terminology:
+
+- Language model == feature extraction
+- CLassifying == finetuning
+
+> Then the reinitialized layer’s parameters have .requires_grad=True by default. -- https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+'''
+
+
+# Freeze/ unfreeze
+# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+# Send the model to GPU
+model_ft = model_ft.to(device)
+
+# Gather the parameters to be optimized/updated in this run. If we are
+#  finetuning we will be updating all parameters. However, if we are
+#  doing feature extract method, we will only update the parameters
+#  that we have just initialized, i.e. the parameters with requires_grad
+#  is True.
+params_to_update = model_ft.parameters()
+print("Params to learn:")
+if feature_extract:
+    params_to_update = []
+    for name,param in model_ft.named_parameters():
+        if param.requires_grad == True:
+            params_to_update.append(param)
+            print("\t",name)
+else:
+    for name,param in model_ft.named_parameters():
+        if param.requires_grad == True:
+            print("\t",name)
+
+# Observe that all parameters are being optimized
+optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+
+
+
+def train_ft():
+    # Turn on training mode which enables dropout.
+    model_ft.train()  # defaults to train anyway, here to make this explicit
+
+    start_time = time.time()
+    ntokens = len(corpus.dictionary)
+    
+    hidden = model_ft.init_hidden(batch_size)
+    
+    for batch, i in enumerate(range(0, train_data.size(0) - 1, bptt)):
+        # To overfit one batch do
+        # ... in [next(enumerate(range(0, train_data.size(0) - 1, bptt)))]
+        # Then revert
+        # ... in enumerate(range(0, train_data.size(0) - 1, bptt))
+        data, targets = get_batch(train_data, i)
+        
+        optimizer_ft.zero_grad()
+        # model.zero_grad()
+        
+        # Starting each batch, we detach the hidden state from how it was previously produced.
+        # If we didn't, the model would try backpropagating all the way to start of the dataset.
+        hidden = repackage_hidden(hidden)
+        
+        output, hidden = model_ft(data, hidden)
+        '''
+        model(batch, hidden)[0].shape
+        torch.Size([3000, 9978])
+        len(targets)
+        3000
+        '''
+        
+        # TODO: load targets
+        targets = torch.randint(0, 2, [200]).view([100, 2]).float()
+        loss = criterion_ft(output, targets)
+
+        loss.backward()
+        # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+        torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+        
+        optimizer_ft.step()
+
+        # for p in model.parameters():
+        #     p.data.add_(-lr, p.grad)
+
+        # total_loss += loss.item()
+
+        if batch % log_interval == 0:
+            print(loss)
+            # cur_loss = total_loss / log_interval
+            # elapsed = time.time() - start_time
+            # print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+            #         'loss {:5.2f} | ppl {:8.2f}'.format(
+            #     epoch, batch, len(train_data) // bptt, lr,
+            #     elapsed * 1000 / log_interval, cur_loss, math.exp(cur_loss)))
+            # total_loss = 0
+            # start_time = time.time()
+
+    return loss.detach().item()
+
+
+for epoch in range(1, epochs+1):
+    train_loss = train_ft()
+    print(train_loss)
+
+
+
+data, targets = get_batch(train_data, 0)
+targets = torch.randint(0, 2, [200]).view([100, 2]).float()
+
+emb = model_ft.encoder(data)
+
+hidden = model_ft.init_hidden(batch_size)
+hidden = repackage_hidden(hidden)
+o, h = model_ft.rnn(emb, hidden)
+decoded = model_ft.decoder(o)  # .shape is torch.Size([30, 100, 2])
+
+torch.log_softmax(decoded.view(-1, nclass), dim=1).shape
+# torch.Size([3000, 2])
+torch.sigmoid(decoded.view(-1, nclass)).shape
+# torch.Size([3000, 2])
+
+
+
+
