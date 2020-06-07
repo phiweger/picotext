@@ -368,12 +368,7 @@ print('=' * 89)
 
 
 # TODO:
-'''
-            # topk = 10
-            # for ix, j in enumerate(output):
-            #     foo = j.argsort()[-topk:]
-            #     bar.append(targets[ix] in foo)
-'''
+# save and load best model
 
 
 # tensorboard --logdir .
@@ -535,16 +530,14 @@ Terminology:
 '''
 
 
-# Freeze/ unfreeze
-# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
-# Send the model to GPU
-model_ft = model_ft.to(device)
+
 
 # Gather the parameters to be optimized/updated in this run. If we are
 #  finetuning we will be updating all parameters. However, if we are
 #  doing feature extract method, we will only update the parameters
 #  that we have just initialized, i.e. the parameters with requires_grad
 #  is True.
+'''
 params_to_update = model_ft.parameters()
 print("Params to learn:")
 if feature_extract:
@@ -560,7 +553,16 @@ else:
 
 # Observe that all parameters are being optimized
 optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+'''
 
+
+# TODO
+def get_batch_with_labels(fp):
+    '''
+    Use tokenize method from Corpus? Advantage is we would be sure to
+    use the same numericalization indices.
+    '''
+    pass
 
 
 def train_ft():
@@ -623,12 +625,18 @@ def train_ft():
     return loss.detach().item()
 
 
+
+# Freeze/ unfreeze
+# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+# Send the model to GPU
+model_ft = model_ft.to(device)
+
 for epoch in range(1, epochs+1):
     train_loss = train_ft()
     print(train_loss)
 
 
-
+# Manual walkthrough to check dimensions etc.
 data, targets = get_batch(train_data, 0)
 targets = torch.randint(0, 2, [200]).view([100, 2]).float()
 
@@ -645,5 +653,174 @@ torch.sigmoid(decoded.view(-1, nclass)).shape
 # torch.Size([3000, 2])
 
 
+
+'''
+TODO: pad, allow 0s and unequal lengths
+
+- https://suzyahyah.github.io/pytorch/2019/07/01/DataLoader-Pad-Pack-Sequence.html
+- https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
+- on the collate fn https://discuss.pytorch.org/t/batching-with-padded-sequences-and-pack-padded-sequence/65501/3
+
+yes! how to get padded x and y:
+
+- https://github.com/florijanstamenkovic/PytorchRnnLM/blob/master/main.py#L72
+
+TODO: interesting
+
+- https://github.com/PyTorchLightning/pytorch-lightning
+- https://github.com/pytorch/ignite#why-ignite
+- https://medium.com/pytorch/pytorch-lightning-0-7-1-release-and-venture-funding-dd12b2e75fb3
+- https://github.com/williamFalcon/test-tube
+- https://github.com/lanpa/tensorboardX
+- https://github.com/williamFalcon/deep-learning-gpu-box-build-instructions
+
+Secondary structure:
+
+- https://www.uniprot.org/uniprot/Q9UXC2
+- https://www.rcsb.org/pdb/protein/Q9UXC2
+- https://www.rcsb.org/structure/2C38
+
+'''
+
+
+
+
+
+'''
+We trained the LM w/o padding, but for classification we will. Note that the RNN is length independent, i.e. it is a (stack of) hidden layers unrolled along the sequence. So for classification, we should be able to use padding.
+'''
+
+from torchtext import data
+
+batch_size = 1000  # can be a list w/ sizes for train, dev, test
+TEXT = data.Field(sequential=True, include_lengths=True)
+'''
+> TorchText Fields have a preprocessing argument. A function passed here will be applied to a sentence after it has been tokenized (transformed from a string into a list of tokens), but before it has been numericalized (transformed from a list of tokens to a list of indexes). This is where we'll pass our generate_bigrams function.
+'''
+LABELS = data.LabelField(dtype=torch.float)
+NAMES = data.RawField(is_target=False)
+# TODO: preprocessing=... useful?
+
+
+# Fields are added by column left to write in the underlying table
+fields=[('name', NAMES), ('label', LABELS), ('text', TEXT)]
+
+train, dev, test = data.TabularDataset.splits(
+    path='.', format='CSV', fields=fields,
+    train='train.csv', validation='dev.csv', test='test.csv')
+
+# https://github.com/pytorch/text/issues/641
+train_iter, dev_iter, test_iter = data.BucketIterator.splits(
+    (train, dev, test),
+    batch_size=batch_size,
+    # batch_sizes=(100, 100, 100),
+    sort_key=lambda x: len(x.text),
+    sort_within_batch=True,  # this really allows length bucketing
+    device='cpu')
+
+TEXT.build_vocab(train)
+# TEXT.vocab.itos[1] ... '<pad>'
+# TEXT.vocab.itos[0] ... '<unk>'
+LABELS.build_vocab(train)
+
+
+def train_ft():
+    # Turn on training mode which enables dropout.
+    model_ft.train()  # defaults to train anyway, here to make this explicit
+
+    start_time = time.time()
+    ntokens = len(corpus.dictionary)
+    
+    hidden = model_ft.init_hidden(batch_size)
+    
+    for i, batch in enumerate(train_iter):
+        # To overfit one batch do
+        # ... in [next(enumerate(range(0, train_data.size(0) - 1, bptt)))]
+        # Then revert
+        # ... in enumerate(range(0, train_data.size(0) - 1, bptt))
+        data, targets = batch.text[0], batch.label
+        # print(data, targets)
+        # print(len(data[:, 0]))
+        optimizer_ft.zero_grad()
+        # model.zero_grad()
+        
+        # Starting each batch, we detach the hidden state from how it was previously produced.
+        # If we didn't, the model would try backpropagating all the way to start of the dataset.
+        hidden = repackage_hidden(hidden)
+        
+        try:
+            output, hidden = model_ft(data, hidden)
+        except IndexError:
+            continue
+
+        '''
+        TODO: the vocab is built from the training set but a minimal one and so
+        we can encounter words that are not present in the embedding lookup table
+        
+        IndexError: index out of range in self
+        
+        https://discuss.pytorch.org/t/embeddings-index-out-of-range-error/12582/4
+        https://stackoverflow.com/questions/50747947/embedding-in-pytorch
+        
+        once we use the full data this should not be an issue
+        '''
+
+        output = output.squeeze(1)
+        '''
+        model(batch, hidden)[0].shape
+        torch.Size([3000, 9978])
+        len(targets)
+        3000
+        '''
+        
+        # TODO: load targets
+        # targets = torch.randint(0, 2, [200]).view([100, 2]).float()
+        loss = criterion_ft(output, targets)
+
+        loss.backward()
+        # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+        torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+        
+        optimizer_ft.step()
+
+        # for p in model.parameters():
+        #     p.data.add_(-lr, p.grad)
+
+        # total_loss += loss.item()
+
+        if i % log_interval == 0:
+            print(epoch, i, loss)
+            # cur_loss = total_loss / log_interval
+            # elapsed = time.time() - start_time
+            # print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+            #         'loss {:5.2f} | ppl {:8.2f}'.format(
+            #     epoch, batch, len(train_data) // bptt, lr,
+            #     elapsed * 1000 / log_interval, cur_loss, math.exp(cur_loss)))
+            # total_loss = 0
+            # start_time = time.time()
+
+    return loss.detach().item()
+
+
+init_args =['GRU', ntokens, emsize, nhid, nlayers, dropout, tied]
+nclass = 1
+model_ft = MoreRNN(model, nclass, init_args) 
+
+model_ft = model_ft.to(device)
+criterion_ft = nn.BCELoss()  # WithLogits
+optimizer_ft = torch.optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+log_interval = 1
+
+for epoch in range(1, epochs+1):
+    train_loss = train_ft()
+    print(train_loss)
+
+
+
+for batch in train_iter: pass
+data, targets = batch.text[0], batch.label
+output, hidden = model_ft(data, hidden)
+output = output.squeeze(1)
 
 

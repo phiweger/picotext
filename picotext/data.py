@@ -170,3 +170,4 @@ from picotext.utils import encode_dayhoff, load_sequences, load_pretrained_token
 #         return torch.cat(ids)
 
 
+
