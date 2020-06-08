@@ -1,8 +1,11 @@
 from pathlib import Path
+import json
+from types import SimpleNamespace
 
 import screed
 from screed import ScreedDB
 from tokenizers import CharBPETokenizer
+import torch
 
 
 def train_tokenizer(tokenizer, files: list, **kwargs):
@@ -51,6 +54,20 @@ def load_sequences(path):
     return ScreedDB(path)
 
 
+def load_config(path):
+    '''
+    Load params from json file
+
+    https://stackoverflow.com/questions/43921240
+
+    conf = load_config("config.json")
+    conf.foo
+    '''
+    with open(path, 'r') as fh: 
+        d = json.load(fh)
+    return SimpleNamespace(**d)
+
+
 def encode_dayhoff(seq):
     '''
     Turn a protein sequence into its corresponding Dayhoff encoding. Return
@@ -90,3 +107,31 @@ def encode_dayhoff(seq):
     
     except IndexError:
         return None
+
+
+def batchify(data, bsz, device):
+    '''Splits text into chunks of words of length bsz, "kmerize".'''
+    # TODO: replace w/ BPTTIterator?
+    # Work out how cleanly we can divide the dataset into bsz parts.
+    nbatch = data.size(0) // bsz
+    # Trim off any extra elements that wouldn't cleanly fit (remainders).
+    data = data.narrow(0, 0, nbatch * bsz)
+    # Evenly divide the data across the bsz batches.
+    data = data.view(bsz, -1).t().contiguous()
+    return data.to(device)
+
+
+def repackage_hidden(h):
+    '''Detach hidden states from their history.'''
+    if isinstance(h, torch.Tensor):
+        return h.detach()
+    else:
+        return tuple(repackage_hidden(v) for v in h)
+
+
+def get_batch(source, i, bptt):
+    seq_len = min(bptt, len(source) - 1 - i)
+    data = source[i:i+seq_len]
+    target = source[i+1:i+1+seq_len].view(-1)
+    return data, target
+
