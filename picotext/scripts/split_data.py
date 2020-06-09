@@ -23,60 +23,10 @@ from pathlib import Path
 
 import numpy as np
 import screed
-from tokenizers import CharBPETokenizer
 import torch
 from tqdm import tqdm
 
-
-def encode_dayhoff(seq):
-    '''
-    Turn a protein sequence into its corresponding Dayhoff encoding. Return
-    None if the encoding is not unique (for details on this see comment in
-    scripts/encoding.py)
-
-    https://en.wikipedia.org/wiki/Margaret_Oakley_Dayhoff
-
-    Usage:
-
-    seq = 'MAFSAEDVLKEYDRRRRMEALLLSLYYPNDRKLLDYKEWSPPRVQVEC'
-    encode_dayhoff(seq)
-    # 'ebfbbcceedcfcddddecbeeebeffbccddeecfdcfbbbdececa'
-    '''
-    dayhoff = {
-        'C' + 'U': 'a', 
-        'GSTAP': 'b',
-        'DENQ' + 'Z': 'c',
-        'RHK' + 'O': 'd',
-        'LVMI' + 'J': 'e',
-        'YFW': 'f'}
-
-    encoding = ''
-
-    try:
-        for letter in seq:
-            k_ = [k for k in dayhoff if letter in k][0]
-            encoding += dayhoff[k_]
-        return encoding
-    
-    except IndexError:
-        return None
-
-
-def load_pretrained_tokenizer(tokenizer_type, path_prefix):
-    '''
-    Load a pretrained tokenizer.
-
-    Usage:
-
-    from tokenizers import CharBPETokenizer
-    seq = 'eeeefebeeb'
-    tokenizer = load_pretrained_tokenizer(
-        CharBPETokenizer, './uniprot_sprot.dayhoff')
-    encoded = tokenizer.encode(seq)
-    '''
-    vocab = f'{path_prefix}-vocab.json'
-    merges = f'{path_prefix}-merges.txt'
-    return tokenizer_type(vocab, merges)
+from picotext.utils import encode_dayhoff
 
 
 '''
@@ -86,8 +36,8 @@ cp ToxClassifier/datasets/trainingsets/* tmp/data
 '''
 
 
-tokenizer = load_pretrained_tokenizer(
-    CharBPETokenizer, 'tmp/data/uniprot_sprot.dayhoff')
+# TODO: Allow standard (IUPAC) amino acid code as well as Dayhoff
+translate = True
 
 
 splits = [0.8, 0.1, 0.1]
@@ -119,13 +69,14 @@ with open(Path(outdir) / 'train.csv', 'w+') as train_out, \
                 # groups[name] = group
                 cnt.append(group)
     
-                dayhoff = encode_dayhoff(read.sequence)
-                if dayhoff:
-                    sequence = tokenizer.encode(dayhoff).tokens
+                if translate:
+                    sequence = encode_dayhoff(read.sequence)
+                    if not sequence:
+                        continue
                 else:
-                    continue
+                    sequence = read.sequence
 
-                str_ = f'{name},{label},{" ".join(sequence)}\n'
+                str_ = f'{name},{label},{sequence}\n'
 
                 if group == 'train':
                     train_out.write(str_)

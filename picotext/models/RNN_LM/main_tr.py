@@ -1,9 +1,11 @@
+from tokenizers import CharBPETokenizer
 import torch
 import torch.nn as nn
 from torchtext import data
 
 from picotext.model import RNN_lm, RNN_tr
-from picotext.utils import batchify, get_batch, repackage_hidden, load_config
+from picotext.utils import batchify, get_batch, repackage_hidden
+from picotext.utils import load_pretrained_tokenizer, load_config
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -23,11 +25,26 @@ def train_fn():
     hidden = model.init_hidden(batch_size)
     
     for i, batch in enumerate(train_iter):
+        # print(batch.text[0].shape)
+        # print(hidden.shape)
+        if len(batch) != batch_size:
+            print('Damn')
+            continue
+
+        # The overflow examples' batch is smaller, ignore. Otherwise creates
+        # a RuntimeError. Known problem w/ data.BucketIterator():
+        # https://github.com/pytorch/text/issues/640
+        # https://github.com/pytorch/text/issues/438
+        # stackoverflow.com/questions/54307824
+
+        # print(batch.text[0].shape)
+        # if batch.text[0].shape[-1] != 100:
+        #     break
         # To overfit one batch do
         # ... in [next(enumerate(range(0, train_data.size(0) - 1, bptt)))]
         # Then revert
         # ... in enumerate(range(0, train_data.size(0) - 1, bptt))
-        data, targets = batch.text[0], batch.label
+        data_, targets = batch.text[0], batch.label
         # print(data, targets)
         # print(len(data[:, 0]))
         optimizer.zero_grad()
@@ -36,11 +53,6 @@ def train_fn():
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
-        
-        try:
-            output, hidden = model(data, hidden)
-        except IndexError:
-            continue
 
         '''
         TODO: the vocab is built from the training set but a minimal one and so
@@ -52,7 +64,12 @@ def train_fn():
         https://stackoverflow.com/questions/50747947/embedding-in-pytorch
         
         once we use the full data this should not be an issue
-        '''
+        '''        
+        #try:
+        output, hidden = model(data_, hidden)
+        #except IndexError:
+        #    continue
+
 
         output = output.squeeze(1)
         '''
@@ -88,9 +105,11 @@ def train_fn():
             # total_loss = 0
             # start_time = time.time()
 
-    return loss.detach().item()
+    return loss.detach().item(), batch
 
 
+# TODO: infer
+ntokens = 10000
 
 nclass = 1
 log_interval = 10
@@ -98,6 +117,22 @@ batch_size = 1000  # can be a list w/ sizes for train, dev, test
 
 # Instead of ntokens we pass in nclass here
 # init_args =['GRU', nclass, emsize, nhid, nlayers, dropout, tied]
+
+batch_size = 100
+eval_batch_size = 10
+bptt = 30
+clip = 0.5
+log_interval = 100
+lr = 0.001# 3e-4  #20
+best_val_loss = None
+epochs = 10
+save = 'foo'
+emsize = 100
+nhid = 100#1024
+nlayers = 2
+dropout = 0.5
+tied = False
+save = 'foo.model'
 
 init_args = {
     'rnn_type': 'GRU',
@@ -110,8 +145,18 @@ init_args = {
     }
 
 
-TEXT = data.Field(sequential=True, include_lengths=True)
-LABELS = data.LabelField(dtype=torch.float)
+tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2')
+ntokens = len(tokenizer.get_vocab())
+
+
+# We have to use the same numericalization as in the example before.
+TEXT = data.Field(
+    sequential=True,
+    include_lengths=True,
+    use_vocab=True,
+    tokenize=lambda x : tokenizer.encode(x).tokens)
+
+LABELS = data.LabelField(dtype=torch.float, is_target=True)  # , is_target=True
 NAMES = data.RawField(is_target=False)
 
 # Fields are added by column left to write in the underlying table
@@ -121,6 +166,39 @@ train, dev, test = data.TabularDataset.splits(
     path='.', format='CSV', fields=fields,
     train='train.csv', validation='dev.csv', test='test.csv')
 
+TEXT.build_vocab()  # We'll fill this w/ the tokenizer
+# https://github.com/pytorch/text/issues/358
+# TEXT.vocab.itos[1] ... '<pad>'
+# TEXT.vocab.itos[0] ... '<unk>'
+# TEXT.vocab.itos[:10]
+# ['<unk>', '<pad>', 33, 1, 35, 43, 28, 32, 48, 45]
+# Make sure the numericalisation is the same used in the tokenizer AND
+# thus across models the numericalisation is the same.
+TEXT.vocab.stoi = tokenizer.get_vocab()
+# d = {k: v for k, v in sorted(tokenizer.get_vocab().items(), key=lambda item: item[1])}
+'''
+TODO: missing is the <pad> token
+{'<unk>': 0,
+ 'a': 1,
+  ...
+ 'f': 6,
+ 'e</w>': 7,
+  ...
+ 'a</w>': 12,
+'''
+# Sort tokenizer dict by value, take keys, transfer to TEXT field.
+TEXT.vocab.itos = [k for k, v in sorted(tokenizer.get_vocab().items(), key=lambda item: item[1])]
+# What's in the bag? -- TEXT.vocab.itos[:10]
+# ['<unk>', 'a', 'b', 'c', 'd', 'e', 'f', 'e</w>', 'c</w>', 'd</w>']
+LABELS.build_vocab(train)
+
+
+# Make sure the numericalisation is from the tokenizer, not random
+a = [k for k, v in sorted(TEXT.vocab.stoi.items(), key=lambda item: item[1])]
+b = [k for k, v in sorted(tokenizer.get_vocab().items(), key=lambda item: item[1])]
+assert a == b
+
+
 # https://github.com/pytorch/text/issues/641
 train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     (train, dev, test),
@@ -128,12 +206,10 @@ train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     # batch_sizes=(100, 100, 100),
     sort_key=lambda x: len(x.text),
     sort_within_batch=True,  # this really allows length bucketing
-    device='cpu')
-
-TEXT.build_vocab(train)
-# TEXT.vocab.itos[1] ... '<pad>'
-# TEXT.vocab.itos[0] ... '<unk>'
-LABELS.build_vocab(train)
+    device=device)
+# BucketIterator will reorder the samples on each iteration, i.e. calling the
+# following line twice will result in two reorderings of the samples.
+for i in train_iter: pass
 
 
 # Load model
@@ -143,15 +219,50 @@ model = RNN_tr(init_args, nclass, pretrained_model).to(device)
 # OR load a new model w/ random weights
 # model_ft = RNN_tr(init_args)
 
+
+# Freeze all layers
+# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+for name, param in model.named_parameters():
+    if not name in ['decoder.weight', 'decoder.bias']:
+        param.requires_grad = False
+    print(f'{param.requires_grad}\t{name}')
+# TODO: thaw layers iteratively
+# optimizer_ft.add_param_group?
+
+
 criterion = nn.BCELoss().to(device)
 # WithLogits?
-optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+# https://discuss.pytorch.org/t/understanding-nllloss-function/23702
+# https://discuss.pytorch.org/t/cross-entropy-with-one-hot-targets/13580/4
+
+optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
+# optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 # TODO: scheduler
 
 
+
+import pdb, traceback, sys
+
 for epoch in range(1, epochs+1):
-    train_loss = train_fn()
+    # try:
+    train_loss, batch = train_fn()
     print(round(train_loss, 4))
+    # except RuntimeError:
+    #     extype, value, tb = sys.exc_info()
+    #     traceback.print_exc()
+    #     pdb.post_mortem(tb)
+
+'''
+~/miniconda3/envs/picotext/lib/python3.7/site-packages/torch/nn/modules/rnn.py in check_hidden_size(self, hx, expected_hidden_size, msg)
+    185         # type: (Tensor, Tuple[int, int, int], str) -> None
+    186         if hx.size() != expected_hidden_size:
+--> 187             raise RuntimeError(msg.format(expected_hidden_size, tuple(hx.size())))
+    188
+    189     def check_forward_args(self, input, hidden, batch_sizes):
+
+RuntimeError: Expected hidden size (2, 85, 100), got (2, 100, 100)
+'''
 
 
 
@@ -206,28 +317,6 @@ def forward(self, input, hidden):
 m2.forward = forward
 m2(m2, batch, hidden)
 '''
-
-
-
-
-
-init_args =['GRU', ntokens, emsize, nhid, nlayers, dropout, tied]
-nclass = 2
-model_ft = RNN_tr(model, nclass, init_args)  # ft .. finetune
-
-# Freeze all layers
-# https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
-for name, param in model_ft.named_parameters():
-    if not name in ['decoder.weight', 'decoder.bias']:
-        param.requires_grad = False
-    print(f'{param.requires_grad}\t{name}')
-# TODO: thaw layers iteratively
-# optimizer_ft.add_param_group?
-
-
-criterion_ft = nn.BCELoss()  # WithLogits
-optimizer_ft = torch.optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
-
 
 '''
 # Observe that all parameters are being optimized

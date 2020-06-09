@@ -105,7 +105,7 @@ def encode_dayhoff(seq):
             encoding += dayhoff[k_]
         return encoding
     
-    except IndexError:
+    except IndexError:  # amino-acid not in our dict
         return None
 
 

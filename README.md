@@ -19,8 +19,65 @@ osf -p pefs7 clone
 ```
 
 
+### Train tokenizer
+
+
+```bash
+for i in 1 0.5 0.25 0.125 0.0625 0.03125
+do
+    python preprocess.py --seq uniref50.fasta.gz --out uniref50.${i}.dayhoff.txt -p ${i} --skip-header --maxlen 2000 --excluded-aa XBZJ
+done
+```
+
+
+```python
+from tokenizers import CharBPETokenizer
+from picotext.utils import train_tokenizer
+
+files = ['uniref50.0p0625.dayhoff.txt']
+
+tokenizer = train_tokenizer(
+    CharBPETokenizer(bert_normalizer=False),
+    files,
+    vocab_size=30000, min_frequency=5, special_tokens=['<unk>', '<pad>'])
+tokenizer.save('.', 'uniref50.0p0625.dayhoff.vocab30k.freq5')
+```
+
+
+
+
 
 ### TODO
+
+
+Use other pretrained sequences, e.g. "Unirep" as coded for JAX [here](https://github.com/ElArkk/jax-unirep) -- supposed to be much faster and Tensorflow independent.
+
+
+```bash
+conda create -y -n unirep python=3.7 ipython
+conda activate unirep
+# https://github.com/google/jax#installation
+pip install --upgrade pip
+pip install --upgrade jax jaxlib  # CPU-only version
+# https://github.com/ElArkk/jax-unirep
+pip install tqdm optuna sklearn
+pip install git+https://github.com/ElArkk/jax-unirep.git
+```
+
+
+```python
+from jax_unirep import get_reps
+
+sequence = "ASDFGHJKL"
+
+# h_avg is the canonical "reps"
+h_avg, h_final, c_final = get_reps(sequence)
+h_avg.shape
+# (1, 1900)
+```
+
+
+
 
 load data:
 

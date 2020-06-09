@@ -49,8 +49,7 @@ class RNN_base(nn.Module):
                     weight.new_zeros(self.nlayers, bsz, self.nhid))
         else:
             # only hidden
-            return weight.new_zeros(self.nlayers, bsz, self.nhid)
-        
+            return weight.new_zeros(self.nlayers, bsz, self.nhid)        
 
 
 class RNN_lm(RNN_base):
@@ -93,16 +92,19 @@ class RNN_tr(RNN_base):
     - forward fn
     '''
     def __init__(self, init_args, nclass=2, pretrained_model=None):
-        super(RNN_lm, self).__init__(**init_args)
+        super(RNN_tr, self).__init__(**init_args)
 
         # We now predict one out of n classes, not one out of n tokens
         # as in the language model RNN
         self.nclass = nclass
 
         if pretrained_model:
-            self.load_state_dict(pretrained_model.state_dict())
+            self.load_state_dict(pretrained_model.state_dict(), strict=False)
+            # strict ... whether to strictly enforce that the keys match
+            # Otherwise error: Unexpected key(s) in state_dict: 
+            # "decoder.weight", "decoder.bias".
 
-        self.decoder = nn.Linear(nhid, nclass)
+        self.decoder = nn.Linear(self.nhid, self.nclass)
 
     def forward(self, input, hidden):
         emb = self.drop(self.encoder(input))

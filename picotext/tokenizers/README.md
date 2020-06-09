@@ -3,6 +3,8 @@
 `vocab10k.freq2`
 
 ```python
+from picotext.utils import train_tokenizer
+
 files = ['2020-05-29_uniref50.dayhoff.txt']
 
 tokenizer = train_tokenizer(

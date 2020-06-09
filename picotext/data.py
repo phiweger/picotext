@@ -11,9 +11,35 @@ import os
 from io import open
 import torch
 
+'''
+mkdir -p tmp/data
+mkdir tmp/processed
+cp ToxClassifier/datasets/trainingsets/* tmp/data
+'''
 
+
+# tokenizer = load_pretrained_tokenizer(
+#     CharBPETokenizer, 'tmp/data/uniprot_sprot.dayhoff')
+
+
+
+# # TODO:
+# # CharBPETokenizer.train?
+# # special_tokens: List[Union[str, AddedToken]] = ['<unk>'],
+# files = ['2020-05-29_uniref50.dayhoff.txt']
+
+# tokenizer = train_tokenizer(
+#     CharBPETokenizer(bert_normalizer=False),
+#     files,
+#     vocab_size=10000, min_frequency=2,
+#     special_tokens=['<unk>', '<pad>'])
+# tokenizer.save('.', '2020-05-29_uniref50.dayhoff.vocab10k.freq2')
+
+
+
+'''
 class Dictionary(object):
-    def __init__(self):
+    def __init__(self, tokenizer):
         self.word2idx = {}
         self.idx2word = []
 
@@ -25,10 +51,39 @@ class Dictionary(object):
 
     def __len__(self):
         return len(self.idx2word)
+'''
+
 
 
 class Corpus(object):
-    def __init__(self, path):
+    def __init__(self, path, tokenizer):
+        self.vocab = tokenizer.get_vocab()
+        self.train = self.tokenize(
+            os.path.join(path, 'train.lm.txt'), tokenizer)
+        self.dev = self.tokenize(
+            os.path.join(path, 'dev.lm.txt'), tokenizer)
+        self.test = self.tokenize(
+            os.path.join(path, 'test.lm.txt'), tokenizer)
+
+    def tokenize(self, path, tokenizer):
+        """Tokenizes a text file."""
+        assert os.path.exists(path)
+
+        with open(path, 'r', encoding="utf8") as f:
+            idss = []
+
+            for line in f:
+                ids = tokenizer.encode(line.strip()).ids
+                ids = torch.tensor(ids).type(torch.int64)
+                idss.append(ids)
+
+            ids = torch.cat(idss)
+        return ids
+
+
+'''
+class Corpus(object):
+    def __init__(self, path, tokenizer):
         self.dictionary = Dictionary()
         self.train = self.tokenize(os.path.join(path, 'train.lm.txt'))
         self.dev = self.tokenize(os.path.join(path, 'dev.lm.txt'))
@@ -56,3 +111,4 @@ class Corpus(object):
             ids = torch.cat(idss)
 
         return ids
+'''
