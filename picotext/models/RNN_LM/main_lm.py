@@ -113,7 +113,7 @@ c = load_config(args.config)
 
 batch_size = c.batch_size
 # eval_batch_size = 10
-bptt = 30
+bptt = c.bptt
 clip = 0.5
 log_interval = c.log_interval
 lr = 0.001# 3e-4  #20
