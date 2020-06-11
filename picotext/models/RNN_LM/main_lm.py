@@ -153,7 +153,7 @@ TEXT.vocab.itos[0] ... '<unk>'
 tokenizer = load_pretrained_tokenizer(CharBPETokenizer, c.tokenizer)
 
 print('Loading corpus ...')
-corpus = Corpus('.', tokenizer)
+corpus = Corpus(c.data, tokenizer)
 ntokens = len(corpus.vocab)
 
 print('Moving along')
