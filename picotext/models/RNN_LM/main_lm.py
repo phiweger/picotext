@@ -73,7 +73,7 @@ def evaluate(data_source):
     total_loss = 0.
 
     ntokens = len(corpus.vocab)
-    hidden = model.init_hidden(eval_batch_size)
+    hidden = model.init_hidden(batch_size)
     
     with torch.no_grad():
         for i in range(0, data_source.size(0) - 1, bptt):
