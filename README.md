@@ -45,7 +45,7 @@ head -n 37000000 uniref50.clean.dayhoff.shuffle.txt | tail -n 2000000 > uniref50
 tail -n 2222662 uniref50.clean.dayhoff.shuffle.txt > uniref50.clean.dayhoff.test.lm.txt
 # 35000000 + 2000000 + 2222662 - 39222662 = 0
 
-head -n100000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/train.lm.txt
+head -n3000000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/train.lm.txt
 head -n110000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/tmp
 tail -n10000 lm_redux/tmp > lm_redux/dev.lm.txt
 head -n120000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/tmp
@@ -70,7 +70,7 @@ tokenizer.save('.', 'uniref50.0p0625.dayhoff.vocab30k.freq5')
 ### Train
 
 ```bash
-DATAVERSION=6
+DATAVERSION=9
 floyd run --gpu --data phiweger/datasets/lm_redux/${DATAVERSION}:data --mode job --env pytorch-1.4 --message "lm redux" --max-runtime 10000 --follow "\
     pip install --upgrade pip && \
     pip install screed tqdm tokenizers==0.7.0 && \
