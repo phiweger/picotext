@@ -111,18 +111,17 @@ args = parser.parse_args()
 
 c = load_config(args.config)
 
-batch_size = 100
-eval_batch_size = 10
+batch_size = c.batch_size
+# eval_batch_size = 10
 bptt = 30
 clip = 0.5
-log_interval = 100
+log_interval = c.log_interval
 lr = 0.001# 3e-4  #20
 best_val_loss = None
 epochs = c.epochs
-save = 'foo'
-emsize = 100
-nhid = 100#1024
-nlayers = 2
+emsize = c.emsize
+nhid = c.nhid#1024
+nlayers = c.nlayers
 dropout = 0.5
 tied = False
 save = 'foo.model'
@@ -159,8 +158,8 @@ ntokens = len(corpus.vocab)
 
 print('Moving along')
 train_data = batchify(corpus.train, batch_size, device)
-dev_data = batchify(corpus.dev, eval_batch_size, device)
-test_data = batchify(corpus.test, eval_batch_size, device)
+dev_data = batchify(corpus.dev, batch_size, device)
+test_data = batchify(corpus.test, batch_size, device)
 
 
 
