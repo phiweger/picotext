@@ -103,7 +103,12 @@ def evaluate(data_source):
     return loss_avg
 
 
-c = load_config('config.json')
+
+parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument('--config', default='config.json', help='Path to config file [json]')
+args = parser.parse_args()
+
+c = load_config(args.config)
 
 batch_size = 100
 eval_batch_size = 10
