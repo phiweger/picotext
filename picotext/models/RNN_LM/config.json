@@ -1,5 +1,5 @@
 {
-    "tokenizer": "/data/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2",
+    "tokenizer": "picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2",
     "data": "/data",
     "batch_size": 100,
     "eval_batch_size": 10,
