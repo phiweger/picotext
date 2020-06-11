@@ -70,7 +70,13 @@ tokenizer.save('.', 'uniref50.0p0625.dayhoff.vocab30k.freq5')
 ### Train
 
 ```bash
-floyd run --gpu --data phiweger/datasets/lm_redux/1:data --mode job --env pytorch-1.4 --message "lm redux" --max-runtime 10000 --follow "pip install screed tqdm tokenizers==0.7.0 && git clone https://github.com/phiweger/picotext && pip install git+https://github.com/phiweger/picotext && python picotext/picotext/models/RNN_LM/main_lm.py"
+floyd run --gpu --data phiweger/datasets/lm_redux/1:data --mode job --env pytorch-1.4 --message "lm redux" --max-runtime 10000 --follow "\
+    pip install --upgrade pip && \
+    pip install screed tqdm tokenizers==0.7.0 && \
+    git clone https://github.com/phiweger/picotext && \
+    pip install git+https://github.com/phiweger/picotext && \
+    cp picotext/picotext/models/RNN_LM/main_lm.py . && \
+    python main_lm.py"
 ```
 
 

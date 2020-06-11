@@ -61,6 +61,7 @@ def train():
         # train_loss = round(loss.detach().item(), 4)
         if batch % log_interval == 0:
             print(round(total_loss / log_interval, 4))
+            train_loss = total_loss
             total_loss = 0.
 
     return train_loss
