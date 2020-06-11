@@ -1,3 +1,9 @@
+'''
+TODO:
+
+- avg training loss
+- baseline? ie what is the prediction 
+'''
 from tokenizers import CharBPETokenizer
 import torch
 import torch.nn as nn
@@ -21,7 +27,7 @@ We trained the LM w/o padding, but for classification we will. Note that the RNN
 def train_fn():
     # Turn on training mode which enables dropout.
     model.train()  # defaults to train anyway, here to make this explicit
-    
+    total_loss, n = 0., 0
     hidden = model.init_hidden(batch_size)
     
     for i, batch in enumerate(train_iter):
@@ -71,31 +77,22 @@ def train_fn():
         #    continue
 
 
-        output = output.squeeze(1)
-        '''
-        model(batch, hidden)[0].shape
-        torch.Size([3000, 9978])
-        len(targets)
-        3000
-        '''
-        
-        # TODO: load targets
-        # targets = torch.randint(0, 2, [200]).view([100, 2]).float()
-        loss = criterion(output, targets)
+        loss = criterion(output.squeeze(1), targets)
 
         loss.backward()
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
         
         optimizer.step()
-
+        total_loss += loss.item()
         # for p in model.parameters():
         #     p.data.add_(-lr, p.grad)
 
         # total_loss += loss.item()
 
         if i % log_interval == 0:
-            print(epoch, i, loss)
+            print(epoch, i, round(total_loss / log_interval, 4))
+            total_loss = 0.
             # cur_loss = total_loss / log_interval
             # elapsed = time.time() - start_time
             # print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
@@ -105,21 +102,46 @@ def train_fn():
             # total_loss = 0
             # start_time = time.time()
 
-    return loss.detach().item(), batch
+
+def evaluate():
+    # Turn on evaluation mode which disables dropout.
+    model.eval()
+    total_loss, n = 0., 0
+
+    hidden = model.init_hidden(batch_size)
+    
+    with torch.no_grad():
+        for i, batch in enumerate(dev_iter):
+            if len(batch) != batch_size:
+                print('Damn')
+                continue
+            
+            data_, targets = batch.text[0], batch.label
+            output, hidden = model(data_, hidden)
+            hidden = repackage_hidden(hidden)
+            
+            # loss = criterion(output, targets)
+            total_loss += len(data_) * criterion(output.squeeze(1), targets).item()
+            n += len(batch)
+
+    loss_avg = round(total_loss / n, 4)
+    print('Dev loss:', loss_avg)
 
 
-# TODO: infer
-ntokens = 10000
+tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2')
+ntokens = len(tokenizer.get_vocab())
+print(f'Found {ntokens} tokens')
+
 
 nclass = 1
 log_interval = 10
-batch_size = 1000  # can be a list w/ sizes for train, dev, test
 
 # Instead of ntokens we pass in nclass here
 # init_args =['GRU', nclass, emsize, nhid, nlayers, dropout, tied]
 
 batch_size = 100
-eval_batch_size = 10
+# Can be a list w/ sizes for train, dev, test -- but we'd need to rewrite
+# train and evaluate fn
 bptt = 30
 clip = 0.5
 log_interval = 100
@@ -143,10 +165,6 @@ init_args = {
     'dropout': dropout,
     'tie_weights': tied,
     }
-
-
-tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2')
-ntokens = len(tokenizer.get_vocab())
 
 
 # We have to use the same numericalization as in the example before.
@@ -222,10 +240,14 @@ model = RNN_tr(init_args, nclass, pretrained_model).to(device)
 
 # Freeze all layers
 # https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html#initialize-and-reshape-the-networks
+
+'''
 for name, param in model.named_parameters():
     if not name in ['decoder.weight', 'decoder.bias']:
         param.requires_grad = False
     print(f'{param.requires_grad}\t{name}')
+'''
+
 # TODO: thaw layers iteratively
 # optimizer_ft.add_param_group?
 
@@ -246,8 +268,8 @@ import pdb, traceback, sys
 
 for epoch in range(1, epochs+1):
     # try:
-    train_loss, batch = train_fn()
-    print(round(train_loss, 4))
+    train_fn()
+    evaluate()
     # except RuntimeError:
     #     extype, value, tb = sys.exc_info()
     #     traceback.print_exc()

@@ -8,6 +8,16 @@ then predict small molecules
 
 skin microbiome interesting, in general outer/ inner surfaces
 
+Unirep:
+
+- https://moalquraishi.wordpress.com/about/
+- https://openreview.net/forum?id=SygLehCqtm
+- https://moalquraishi.wordpress.com/2019/04/01/the-future-of-protein-science-will-not-be-supervised/
+- https://moalquraishi.wordpress.com/2018/02/15/protein-linguistics/
+- [Surge's Public Defense- Shared screen with speaker view](https://harvard.zoom.us/rec/play/ucIsf7qsrG43T4aduQSDB_UsW9XuffisgyIZ-PQJyU-zBiYHZ1b1YOdEYOA26wooeBB5t5dbwjY7B-5a?startTime=1588098937000)
+- [Exploring amino acid functions in a deep mutational landscape](https://www.biorxiv.org/content/10.1101/2020.05.26.116756v1.full.pdf) -- this is like feature engineering, which ideally we want the model to do
+
+
 
 ### Installation
 
@@ -27,6 +37,19 @@ for i in 1 0.5 0.25 0.125 0.0625 0.03125
 do
     python preprocess.py --seq uniref50.fasta.gz --out uniref50.${i}.dayhoff.txt -p ${i} --skip-header --maxlen 2000 --excluded-aa XBZJ
 done
+# for p=1 -- uniref50.clean.dayhoff.txt
+sort -R -o uniref50.clean.dayhoff.shuffle.txt uniref50.clean.dayhoff.txt
+# wc -l yields 39,222,662 sequences
+head -n 35000000 uniref50.clean.dayhoff.shuffle.txt > uniref50.clean.dayhoff.train.lm.txt
+head -n 37000000 uniref50.clean.dayhoff.shuffle.txt | tail -n 2000000 > uniref50.clean.dayhoff.dev.lm.txt
+tail -n 2222662 uniref50.clean.dayhoff.shuffle.txt > uniref50.clean.dayhoff.test.lm.txt
+# 35000000 + 2000000 + 2222662 - 39222662 = 0
+
+head -n100000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/train.lm.txt
+head -n110000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/tmp
+tail -n10000 lm_redux/tmp > lm_redux/dev.lm.txt
+head -n120000 uniref50.clean.dayhoff.shuffle.txt > lm_redux/tmp
+tail -n10000 lm_redux/tmp > lm_redux/test.lm.txt
 ```
 
 
@@ -41,6 +64,13 @@ tokenizer = train_tokenizer(
     files,
     vocab_size=30000, min_frequency=5, special_tokens=['<unk>', '<pad>'])
 tokenizer.save('.', 'uniref50.0p0625.dayhoff.vocab30k.freq5')
+```
+
+
+### Train
+
+```bash
+floyd run --gpu --data phiweger/datasets/lm_redux/1:data --mode job --env pytorch-1.4 --message "lm redux" --max-runtime 10000 --follow "pip install screed tqdm tokenizers==0.7.0 && pip install --user -e /data/picotext && python /data/picotext/picotext/models/RNN_LM/main_lm.py"
 ```
 
 

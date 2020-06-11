@@ -1,4 +1,5 @@
 {
+    "tokenizer": "/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2",
     "batch_size": 100,
     "eval_batch_size": 10,
     "bptt": 30,

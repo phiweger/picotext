@@ -10,6 +10,7 @@ TODO:
 import os
 from io import open
 import torch
+from tqdm import tqdm
 
 '''
 mkdir -p tmp/data
@@ -69,10 +70,11 @@ class Corpus(object):
         """Tokenizes a text file."""
         assert os.path.exists(path)
 
-        with open(path, 'r', encoding="utf8") as f:
+        print(path)
+        with open(path, 'r', encoding="utf8") as file:
             idss = []
 
-            for line in f:
+            for line in tqdm(file):
                 ids = tokenizer.encode(line.strip()).ids
                 ids = torch.tensor(ids).type(torch.int64)
                 idss.append(ids)

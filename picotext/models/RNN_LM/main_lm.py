@@ -1,11 +1,19 @@
+#! /usr/bin/env python
+
 '''
 - https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/1%20-%20Simple%20Sentiment%20Analysis.ipynb
 - https://github.com/pytorch/examples/blob/master/word_language_model/main.py
 
 TODO:
 
-- port vocabulary to transfer task
+- get line by line seq from uniprot (cleaned) then shuffle and split into train, test, dev using shuf and head | tail
+- tensorboard ... write avg loss not llost of last batch
+
+python .../picotext/scripts/preprocess.py --seq uniref50.fasta.gz --out uniref50.clean.dayhoff.txt -p 1 --skip-header --maxlen 2000 --excluded-aa XBZJ
+
+
 '''
+import argparse
 from collections import Counter
 
 import math
@@ -26,6 +34,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def train():
     # Turn on training mode which enables dropout.
     model.train()
+    total_loss = 0.
 
     ntokens = len(corpus.vocab)
     hidden = model.init_hidden(batch_size)
@@ -47,10 +56,12 @@ def train():
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
+        total_loss += loss.item()
 
-        train_loss = round(loss.detach().item(), 4)
+        # train_loss = round(loss.detach().item(), 4)
         if batch % log_interval == 0:
-            print(train_loss)
+            print(round(total_loss / log_interval, 4))
+            total_loss = 0.
 
     return train_loss
 
@@ -78,14 +89,16 @@ def evaluate(data_source):
     sm = nn.Softmax(dim=1)
     p_max = torch.argsort(sm(output), dim=1)[:, -10:]
 
-    nextword = []
-    for ix, i in enumerate(p_max):
-        if ix < 5:
-            print(ix, i, targets[ix])
-        nextword.append(any([x == targets[ix] for x in i]))
+    # TODO: how many words are correct? make this run on test time only, bc/
+    # computationally intensive
+    # nextword = []
+    # for ix, i in enumerate(p_max):
+    #     if ix < 5:
+    #         print(ix, i, targets[ix])
+    #     nextword.append(any([x == targets[ix] for x in i]))
 
-    topk = round(sum(nextword)/len(nextword), 4)
-    print(f'Top-k correct words: {topk}')
+    # topk = round(sum(nextword)/len(nextword), 4)
+    # print(f'Top-k correct words: {topk}')
 
     return loss_avg
 
@@ -132,10 +145,13 @@ models -- maybe save a json for the tokens and map <unk> and <pad> to
 TEXT.vocab.itos[1] ... '<pad>'
 TEXT.vocab.itos[0] ... '<unk>'
 '''
-tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2')
+tokenizer = load_pretrained_tokenizer(CharBPETokenizer, c.tokenizer)
+
+print('Loading corpus ...')
 corpus = Corpus('.', tokenizer)
 ntokens = len(corpus.vocab)
 
+print('Moving along')
 train_data = batchify(corpus.train, batch_size, device)
 dev_data = batchify(corpus.dev, eval_batch_size, device)
 test_data = batchify(corpus.test, eval_batch_size, device)
