@@ -126,7 +126,7 @@ emsize = c.emsize
 nhid = c.nhid#1024
 nlayers = c.nlayers
 dropout = c.dropout
-tied = False
+tied = c.tied
 save = c.save
 
 writer = SummaryWriter(log_dir='log')
