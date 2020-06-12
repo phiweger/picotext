@@ -80,6 +80,8 @@ floyd run --gpu --data phiweger/datasets/lm_redux/${DATAVERSION}:data --mode job
     git clone https://github.com/phiweger/picotext && \
     pip install git+https://github.com/phiweger/picotext && \
     cp picotext/picotext/tokenizers/uniref50.full.* . && \
+    pwd && \
+    ls && \
     python picotext/picotext/models/RNN_LM/main_lm.py --config picotext/picotext/models/RNN_LM/config.json"
 ```
 
