@@ -18,6 +18,7 @@ class RNN_base(nn.Module):
         self.ntoken = ntoken
         self.rnn_type = rnn_type
         self.nhid = nhid
+        self.ninp = ninp
         self.nlayers = nlayers
         self.tie_weights = tie_weights
 

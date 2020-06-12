@@ -104,6 +104,9 @@ def evaluate(data_source):
     return loss_avg
 
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--config', default='config.json', help='Path to config file [json]')
@@ -114,17 +117,17 @@ c = load_config(args.config)
 batch_size = c.batch_size
 # eval_batch_size = 10
 bptt = c.bptt
-clip = 0.5
+clip = c.clip
 log_interval = c.log_interval
-lr = 0.001# 3e-4  #20
+lr = c.lr
 best_val_loss = None
 epochs = c.epochs
 emsize = c.emsize
 nhid = c.nhid#1024
 nlayers = c.nlayers
-dropout = 0.5
+dropout = c.dropout
 tied = False
-save = 'foo.model'
+save = c.save
 
 writer = SummaryWriter(log_dir='log')
 # tensorboard --logdir .
@@ -178,6 +181,9 @@ init_args = {
 
 
 model = RNN_lm(init_args).to(device)
+print(model)
+print(f'The model has {count_parameters(model):,} trainable parameters')
+
 criterion = nn.NLLLoss().to(device)
 '''
 nn.NLLLoss?
