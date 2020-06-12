@@ -8,9 +8,9 @@
     "lr": 3e-4,
     "best_val_loss": null,
     "epochs": 3,
-    "emsize": 256,
-    "nhid": 1024,
-    "nlayers": 3,
+    "emsize": 128,
+    "nhid": 512,
+    "nlayers": 2,
     "dropout": 0.5,
     "tied": true,
     "save": "language.model"
