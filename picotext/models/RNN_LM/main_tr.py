@@ -90,7 +90,7 @@ def train_fn():
 
         # total_loss += loss.item()
 
-        if i % log_interval == 0:
+        if (i % log_interval == 0) and (i != 0):
             print(epoch, i, round(total_loss / log_interval, 4))
             total_loss = 0.
             # cur_loss = total_loss / log_interval
@@ -106,7 +106,7 @@ def train_fn():
 def evaluate():
     # Turn on evaluation mode which disables dropout.
     model.eval()
-    total_loss, n = 0., 0
+    total_loss, total_acc, n = 0., 0., 0
 
     hidden = model.init_hidden(batch_size)
     
@@ -123,34 +123,50 @@ def evaluate():
             # loss = criterion(output, targets)
             total_loss += len(data_) * criterion(output.squeeze(1), targets).item()
             n += len(batch)
+            total_acc += binary_accuracy(output.squeeze(1), targets).item()
 
     loss_avg = round(total_loss / n, 4)
+    acc_avg = round(total_acc / n, 4)
     print('Dev loss:', loss_avg)
+    print('Dev acc: ', acc_avg)
+    print(torch.round(output).T, targets)
+
+def binary_accuracy(preds, y):
+    """
+    slight modification from original
+
+    Returns accuracy per batch, i.e. if you get 8/10 right, this returns 0.8, NOT 8
+    """
+
+    #round predictions to the closest integer
+    rounded_preds = torch.round(preds)
+    correct = (rounded_preds.T == y).float() #convert into float for division 
+    acc = correct.sum() / len(correct)
+    return acc
 
 
-tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.0p0625.dayhoff.vocab10k.freq2')
+tokenizer = load_pretrained_tokenizer(CharBPETokenizer, '/Users/phi/Dropbox/repos_git/picotext/picotext/tokenizers/uniref50.full.dayhoff.vocab30k.freq5')
 ntokens = len(tokenizer.get_vocab())
 print(f'Found {ntokens} tokens')
 
 
 nclass = 1
-log_interval = 10
 
 # Instead of ntokens we pass in nclass here
 # init_args =['GRU', nclass, emsize, nhid, nlayers, dropout, tied]
 
-batch_size = 100
+batch_size = 250
 # Can be a list w/ sizes for train, dev, test -- but we'd need to rewrite
 # train and evaluate fn
 bptt = 30
 clip = 0.5
-log_interval = 100
-lr = 0.001# 3e-4  #20
+log_interval = 25
+lr = 3e-4  #20
 best_val_loss = None
 epochs = 10
 save = 'foo'
 emsize = 100
-nhid = 100#1024
+nhid = 500
 nlayers = 2
 dropout = 0.5
 tied = False
@@ -181,7 +197,7 @@ NAMES = data.RawField(is_target=False)
 fields=[('name', NAMES), ('label', LABELS), ('text', TEXT)]
 
 train, dev, test = data.TabularDataset.splits(
-    path='.', format='CSV', fields=fields,
+    path='/Users/phi/Dropbox/projects/picotext/journal/2020-05-23T1315/tmp/processed', format='CSV', fields=fields,
     train='train.csv', validation='dev.csv', test='test.csv')
 
 TEXT.build_vocab()  # We'll fill this w/ the tokenizer
@@ -232,8 +248,9 @@ for i in train_iter: pass
 
 # Load model
 # https://pytorch.org/tutorials/beginner/saving_loading_models.html
-pretrained_model = torch.load('foo.model')
+pretrained_model = torch.load('/Users/phi/data_local/picotext/models/language.45.model', map_location=torch.device('cpu'))
 model = RNN_tr(init_args, nclass, pretrained_model).to(device)
+
 # OR load a new model w/ random weights
 # model_ft = RNN_tr(init_args)
 
@@ -250,8 +267,6 @@ for name, param in model.named_parameters():
 
 # TODO: thaw layers iteratively
 # optimizer_ft.add_param_group?
-
-
 criterion = nn.BCELoss().to(device)
 # WithLogits?
 
@@ -261,6 +276,15 @@ criterion = nn.BCELoss().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 # optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 # TODO: scheduler
+
+# https://github.com/davidtvs/pytorch-lr-finder/issues/49
+# from torch_lr_finder import LRFinder
+# 
+# optimizer = torch.optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-2)
+# lr_finder = LRFinder(model, optimizer, criterion, device="cpu")
+# lr_finder.range_test(train, end_lr=100, num_iter=100)
+# lr_finder.plot() # to inspect the loss-learning rate graph
+# lr_finder.reset() # to reset the model and optimizer to their initial state
 
 
 

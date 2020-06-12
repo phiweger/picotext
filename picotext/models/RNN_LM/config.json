@@ -1,8 +1,8 @@
 {
     "tokenizer": "/floyd/home/picotext/picotext/tokenizers/uniref50.full.dayhoff.vocab30k.freq5",
     "data": "/data",
-    "batch_size": 125,
-    "bptt": 30,
+    "batch_size": 250,
+    "bptt": 50,
     "clip": 0.5,
     "log_interval": 400,
     "lr": 3e-4,

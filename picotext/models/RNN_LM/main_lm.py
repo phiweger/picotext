@@ -201,6 +201,7 @@ class. -- https://pytorch.org/docs/stable/nn.html#crossentropyloss
 '''
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 # TODO: scheduler
+# https://github.com/davidtvs/pytorch-lr-finder
 
 
 best_dev_loss = None
