@@ -1,5 +1,5 @@
 {
-    "tokenizer": "/data/uniref50.1.dayhoff.vocab30k.freq5",
+    "tokenizer": "uniref50.1.dayhoff.vocab30k.freq5",
     "data": "/data",
     "batch_size": 250,
     "bptt": 30,
