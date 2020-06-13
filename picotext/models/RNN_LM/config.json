@@ -8,11 +8,11 @@
     "lr": 3e-4,
     "best_val_loss": null,
     "epochs": 3,
-    "emsize": 256,
-    "nhid": 256,
+    "emsize": 100,
+    "nhid": 500,
     "nlayers": 2,
     "dropout": 0.5,
-    "tied": true,
+    "tied": false,
     "save": "language.model"
 }
 
