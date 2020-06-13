@@ -123,13 +123,15 @@ def evaluate():
             # loss = criterion(output, targets)
             total_loss += len(data_) * criterion(output.squeeze(1), targets).item()
             n += len(batch)
-            total_acc += binary_accuracy(output.squeeze(1), targets).item()
+            #total_acc += binary_accuracy(output.squeeze(1), targets).item()
 
     loss_avg = round(total_loss / n, 4)
     acc_avg = round(total_acc / n, 4)
     print('Dev loss:', loss_avg)
-    print('Dev acc: ', acc_avg)
-    print(torch.round(output).T, targets)
+    # print('Dev acc: ', acc_avg)
+    print('Acc')
+    print(torch.sum(torch.round(output).T==targets).item()/len(targets))
+
 
 def binary_accuracy(preds, y):
     """
@@ -249,10 +251,12 @@ for i in train_iter: pass
 # Load model
 # https://pytorch.org/tutorials/beginner/saving_loading_models.html
 pretrained_model = torch.load('/Users/phi/data_local/picotext/models/language.45.model', map_location=torch.device('cpu'))
-model = RNN_tr(init_args, nclass, pretrained_model).to(device)
+
+
+# model = RNN_tr(init_args, nclass, pretrained_model).to(device)
 
 # OR load a new model w/ random weights
-# model_ft = RNN_tr(init_args)
+model = RNN_tr(init_args, nclass).to(device)
 
 
 # Freeze all layers
