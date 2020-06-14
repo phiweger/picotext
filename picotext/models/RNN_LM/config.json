@@ -7,10 +7,10 @@
     "log_interval": 400,
     "lr": 0.001,
     "best_val_loss": null,
-    "epochs": 3,
+    "epochs": 20,
     "emsize": 100,
     "nhid": 500,
-    "nlayers": 3,
+    "nlayers": 2,
     "dropout": 0.5,
     "tied": false,
     "save": "language.model"
