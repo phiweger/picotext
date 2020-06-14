@@ -55,8 +55,7 @@ def train():
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-        # optimizer.step()
-        scheduler.step()
+        optimizer.step()
         total_loss += loss.item()
 
         # train_loss = round(loss.detach().item(), 4)
@@ -219,6 +218,8 @@ best_dev_loss = None
 try:
     for epoch in range(1, epochs+1):
         train_loss = train()
+        scheduler.step()
+        
         dev_loss = evaluate(dev_data)
         dev_ppl = round(math.exp(dev_loss), 4)  # perplexity
         
