@@ -55,7 +55,8 @@ def train():
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-        optimizer.step()
+        # optimizer.step()
+        scheduler.step()
         total_loss += loss.item()
 
         # train_loss = round(loss.detach().item(), 4)
@@ -202,6 +203,14 @@ class. -- https://pytorch.org/docs/stable/nn.html#crossentropyloss
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 # TODO: scheduler
 # https://github.com/davidtvs/pytorch-lr-finder
+
+# Cyclical learning rates
+# https://www.jeremyjordan.me/nn-learning-rate/
+# https://pytorch.org/docs/stable/optim.html
+# https://github.com/bckenstler/CLR
+scheduler = torch.optim.lr_scheduler.CyclicLR(
+    optimizer, base_lr=0.001, max_lr=0.1)
+# scheduler.step()  # instead of optimizer.step()
 
 
 best_dev_loss = None

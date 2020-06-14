@@ -253,10 +253,10 @@ for i in train_iter: pass
 pretrained_model = torch.load('/Users/phi/data_local/picotext/models/language.45.model', map_location=torch.device('cpu'))
 
 
-# model = RNN_tr(init_args, nclass, pretrained_model).to(device)
+model = RNN_tr(init_args, nclass, pretrained_model).to(device)
 
 # OR load a new model w/ random weights
-model = RNN_tr(init_args, nclass).to(device)
+# model = RNN_tr(init_args, nclass).to(device)
 
 
 # Freeze all layers
@@ -282,14 +282,22 @@ optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 # TODO: scheduler
 
 # https://github.com/davidtvs/pytorch-lr-finder/issues/49
-# from torch_lr_finder import LRFinder
-# 
-# optimizer = torch.optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-2)
-# lr_finder = LRFinder(model, optimizer, criterion, device="cpu")
-# lr_finder.range_test(train, end_lr=100, num_iter=100)
-# lr_finder.plot() # to inspect the loss-learning rate graph
-# lr_finder.reset() # to reset the model and optimizer to their initial state
+from torch_lr_finder import LRFinder
 
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-7, weight_decay=1e-2)
+lr_finder = LRFinder(model, optimizer, criterion, device="cpu")
+lr_finder.range_test(train_iter, end_lr=100, num_iter=100)
+lr_finder.plot() # to inspect the loss-learning rate graph
+lr_finder.reset() # to reset the model and optimizer to their initial state
+
+
+# Cyclical learning rates
+# https://www.jeremyjordan.me/nn-learning-rate/
+# https://pytorch.org/docs/stable/optim.html
+# https://github.com/bckenstler/CLR
+# scheduler = torch.optim.lr_scheduler.CyclicLR(
+#   optimizer, base_lr=0.001, max_lr=0.1)
+# scheduler.step()  # instead of optimizer.step()
 
 
 import pdb, traceback, sys

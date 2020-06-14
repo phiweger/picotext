@@ -8,14 +8,6 @@ then predict small molecules
 
 skin microbiome interesting, in general outer/ inner surfaces
 
-Unirep:
-
-- https://moalquraishi.wordpress.com/about/
-- https://openreview.net/forum?id=SygLehCqtm
-- https://moalquraishi.wordpress.com/2019/04/01/the-future-of-protein-science-will-not-be-supervised/
-- https://moalquraishi.wordpress.com/2018/02/15/protein-linguistics/
-- [Surge's Public Defense- Shared screen with speaker view](https://harvard.zoom.us/rec/play/ucIsf7qsrG43T4aduQSDB_UsW9XuffisgyIZ-PQJyU-zBiYHZ1b1YOdEYOA26wooeBB5t5dbwjY7B-5a?startTime=1588098937000)
-- [Exploring amino acid functions in a deep mutational landscape](https://www.biorxiv.org/content/10.1101/2020.05.26.116756v1.full.pdf) -- this is like feature engineering, which ideally we want the model to do
 
 
 
