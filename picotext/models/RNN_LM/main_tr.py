@@ -185,6 +185,8 @@ init_args = {
     }
 
 
+# TODO:
+# Rewrite this entire thing: https://github.com/pytorch/text/issues/664
 # We have to use the same numericalization as in the example before.
 TEXT = data.Field(
     sequential=True,

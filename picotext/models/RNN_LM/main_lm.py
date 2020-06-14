@@ -200,7 +200,7 @@ nn.CrossEntropyLoss?
 > This criterion combines nn.LogSoftmax() and nn.NLLLoss() in one single
 class. -- https://pytorch.org/docs/stable/nn.html#crossentropyloss
 '''
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+# optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 # TODO: scheduler
 # https://github.com/davidtvs/pytorch-lr-finder
 
@@ -208,6 +208,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 # https://www.jeremyjordan.me/nn-learning-rate/
 # https://pytorch.org/docs/stable/optim.html
 # https://github.com/bckenstler/CLR
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.8)
 scheduler = torch.optim.lr_scheduler.CyclicLR(
     optimizer, base_lr=0.001, max_lr=0.1)
 # scheduler.step()  # instead of optimizer.step()
